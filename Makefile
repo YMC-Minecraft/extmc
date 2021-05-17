@@ -1,8 +1,3 @@
-# Copyright 2019 ~ 2021 YuutaW Minecraft, All Rights Reserved.
-# Proprietary and confidential.
-# Unauthorized copying of any parts of this file, via any medium is strictly prohibited.
-# Written by Yuuta Liang <yuuta@yuuta.moe>, April 2021.
-
 CFLAGS= \
 	-I.\
        -std=c99 \
