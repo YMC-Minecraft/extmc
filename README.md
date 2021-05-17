@@ -21,6 +21,7 @@ To be continued (🕊️🕊️🕊️)
 ## Install
 
 ```shell
+make release
 make install
 ```
 
