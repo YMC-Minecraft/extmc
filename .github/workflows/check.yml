@@ -7,11 +7,19 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  debug:
 
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v2
     - name: make
-      run: make
+      run: make debug
+  release:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: make
+      run: make release
