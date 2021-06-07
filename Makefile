@@ -14,7 +14,7 @@ OBJ=main.o thpool.o mcin.o plugins.o rcon_host.o rcon.o net.o plugin_registry.o 
 
 BIN=extmc
 
-debug: CFLAGS += -DCONTROL_SOCKET_PATH="\"./extmc.ctl\"" -g3 -O0 -rdynamic
+debug: CFLAGS += -fsanitize=address -DCONTROL_SOCKET_PATH="\"./extmc.ctl\"" -g3 -O0 -rdynamic
 debug: $(BIN)
 
 release: CFLAGS += -DDISABLE_DEBUG

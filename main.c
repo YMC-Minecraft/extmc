@@ -707,7 +707,7 @@ static int main_ctl(int argc, char **argv)
 		length += strlen(argv[i]);
 		if(i != argc - 1) length ++;
 	}
-	char *dat = calloc(length, sizeof(char));
+	char *dat = calloc(length + 1, sizeof(char));
 	strcpy(dat, "");
 	for(int i = 1; i < argc; i ++)
 	{
@@ -715,6 +715,7 @@ static int main_ctl(int argc, char **argv)
 		if(i != argc - 1) strcat(dat, " ");
 	}
 	dprintf(fd, "%s", dat);
+	free(dat);
 
 	ssize_t num_read;
 	int arr_size = 1025;
