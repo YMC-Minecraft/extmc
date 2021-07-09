@@ -5,17 +5,18 @@
 
 #define EPLUGINEXCEED	10
 #define EPLUGINNOTFOUND	74
+#define EPLUGINEXISTS	117
 
 int plugin_registry_init();
 void plugin_registry_free();
 
 int plugin_size();
-struct plugin *plugin_get(int id);
+struct plugin *plugin_get(const char *id);
 struct plugin *plugin_get_by_index(int index);
-int plugin_registry_unload(int stderr_fd, int id);
-int plugin_registry_load(int stderr_fd, const char *path, int *id);
+int plugin_registry_unload(int stderr_fd, const char *id);
+int plugin_registry_load(int stderr_fd, const char *path);
 
-void plugcall_setup_handle(struct plugin *plugin, struct epg_handle *handle);
+void plugcall_setup_handle(const struct plugin *plugin, struct epg_handle *handle);
 
 void plugcall_player_join(void *arg);
 void plugcall_player_leave(void *arg);

@@ -12,31 +12,21 @@
 #define PLUGIN_ID_GEN_MAX_RETRY 1
 
 static int plugin_count = 0;
+/* TODO: May use hashing to improve search preformance */
+/* TODO: May use sorting + binary search to improve search performance */
+static const char **id_arr = NULL;
 static struct plugin *plugin_arr = NULL;
 static pthread_key_t key_plugin;
-
-static int plugin_generate_id()
-{
-	int retry_count = 0;
-	goto gen;
-gen:
-	if(retry_count > PLUGIN_ID_GEN_MAX_RETRY) return -1;
-	int rand_val = rand();
-	for(int i = 0; i < plugin_count; i ++)
-	{
-		if(plugin_get_by_index(i)->id == rand_val)
-		{
-			retry_count ++;
-			goto gen;
-		}
-	}
-	return rand_val;
-}
 
 static void arr_resize(int new_size)
 {
 	if(new_size == 0)
 	{
+		if(id_arr != NULL)
+		{
+			free(id_arr);
+			id_arr = NULL;
+		}
 		if(plugin_arr != NULL)
 		{
 			free(plugin_arr);
@@ -44,6 +34,10 @@ static void arr_resize(int new_size)
 		}
 		return;
 	}
+	if(id_arr == NULL)
+		id_arr = calloc(new_size, sizeof(char *));
+	else
+		id_arr = realloc(id_arr, new_size * sizeof(char *));
 	if(plugin_arr == NULL)
 		plugin_arr = calloc(new_size, sizeof(struct plugin));
 	else
@@ -68,17 +62,17 @@ int plugin_size()
 	return plugin_count;
 }
 
-static int plugin_id_to_index(int id)
+static int plugin_id_to_index(const char *id)
 {
 	for(int i = 0; i < plugin_count; i ++)
 	{
-		if(plugin_arr[i].id == id)
+		if(!strcmp(id_arr[i], id))
 			return i;
 	}
 	return -1;
 }
 
-struct plugin *plugin_get(int id)
+struct plugin *plugin_get(const char *id)
 {
 	const int index = plugin_id_to_index(id);
 	if(index < 0)
@@ -91,7 +85,7 @@ struct plugin *plugin_get_by_index(int index)
 	return &plugin_arr[index];
 }
 
-int plugin_registry_unload(int stderr_fd, int id)
+int plugin_registry_unload(int stderr_fd, const char *id)
 {
 	int r = 0;
 	const int index = plugin_id_to_index(id);
@@ -103,30 +97,38 @@ int plugin_registry_unload(int stderr_fd, int id)
 	struct plugin *plug = plugin_get_by_index(index);
 	r = plugin_unload(stderr_fd, plug);
 	if(r) goto cleanup;
+	r = plugin_unload_meta(stderr_fd, plug);
+	if(r) goto cleanup;
 	memcpy(plug, &plugin_arr[index + 1], (plugin_count - 1 - index) * sizeof(struct plugin));
+	memcpy((char **)id_arr[index], &id_arr[index + 1], (plugin_count - 1 - index) * sizeof(char *));
 	arr_resize(-- plugin_count);
 	goto cleanup;
 cleanup:
 	return r;
 }
 
-int plugin_registry_load(int stderr_fd, const char *path, int *id)
+int plugin_registry_load(int stderr_fd, const char *path)
 {
 	int r = 0;
-	const int id_gen = plugin_generate_id();
-	if(id_gen <= 0)
+	struct plugin plugin;
+	r = plugin_load_meta(stderr_fd, path, &plugin);
+	if(r) goto cleanup;
+	if(plugin_get(plugin.id) != NULL)
 	{
-		r = EPLUGINEXCEED;
+		dprintf(stderr_fd, _("Plugin '%s' exists.\n"), plugin.id);
+		plugin_unload_meta(stderr_fd, &plugin);
+		r = EPLUGINEXISTS;
+		goto cleanup;
+	}
+	r = plugin_load(stderr_fd, &plugin);
+	if(r)
+	{
+		plugin_unload_meta(stderr_fd, &plugin);
 		goto cleanup;
 	}
 	arr_resize(++ plugin_count);
-	r = plugin_load(stderr_fd, path, id_gen, &plugin_arr[plugin_count - 1]);
-	if(r)
-	{
-		arr_resize(-- plugin_count);
-		goto cleanup;
-	}
-	*id = id_gen;
+	id_arr[plugin_count - 1] = plugin.id;
+	memcpy(&plugin_arr[plugin_count - 1], &plugin, sizeof(struct plugin));
 	goto cleanup;
 cleanup:
 	return r;
@@ -136,7 +138,7 @@ static int api_rcon_send_wrapper(int pkt_id, char *command)
 {
 	int r = 0;
 	const struct plugin *plug = pthread_getspecific(key_plugin);
-	printf(_("[rcon#%d] -> '%s' (%d)\n"),
+	printf(_("[rcon#%s] -> '%s' (%d)\n"),
 			plug->id,
 			command,
 			pkt_id);
@@ -154,7 +156,7 @@ static int api_rcon_recv_wrapper(int *pkt_id, char *out)
 	// TODO: The plugin identity may have future usages.
 	r = rcon_host_recv(pkt_id, out);
 	if(!r)
-		printf(_("[rcon#%d] <- %s (%d)\n"),
+		printf(_("[rcon#%s] <- %s (%d)\n"),
 				plug->id,
 				out,
 				*pkt_id);
@@ -163,7 +165,7 @@ cleanup:
 	return r;
 }
 
-void plugcall_setup_handle(struct plugin *plugin, struct epg_handle *handle)
+void plugcall_setup_handle(const struct plugin *plugin, struct epg_handle *handle)
 {
 	pthread_setspecific(key_plugin, plugin);
 	handle->id = plugin->id;

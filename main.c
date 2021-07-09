@@ -95,9 +95,8 @@ static int autoload(const char *config_path)
 		current_path[strlen(current_path) - 1] = '\0';
 		if(strlen(current_path) > 0)
 		{
-			int id = 0;
-			if(!plugin_registry_load(2, current_path, &id))
-				printf(_("Autoload: loaded %s with ID %d.\n"), current_path, id);
+			if(!plugin_registry_load(2, current_path))
+				printf(_("Autoload: loaded %s.\n"), current_path);
 		}
 		free(current_path);
 	}
@@ -182,7 +181,7 @@ static int main_handle_cmd(const int out, int argc, char **argv)
 		for(int i = 0; i < plugin_size(); i ++)
 		{
 			const struct plugin *plug = plugin_get_by_index(i);
-			dprintf(out, _("%d\t%s\n"), plug->id, plug->name);
+			dprintf(out, _("%s\t%s\n"), plug->id, plug->name);
 		}
 		return 0;
 	}
@@ -196,12 +195,7 @@ static int main_handle_cmd(const int out, int argc, char **argv)
 		dprintf(out, _("Waiting until the processing is done.\n"));
 		exclusive_section_enter();
 		thpool_wait(thpool);
-		int id = -1;
-		int r = plugin_registry_load(out, argv[1], &id);
-		if(!r)
-		{
-			dprintf(out, _("ID: %d\n"), id);
-		}
+		int r = plugin_registry_load(out, argv[1]);
 		exclusive_section_leave();
 		return r;
 	}
@@ -212,14 +206,7 @@ static int main_handle_cmd(const int out, int argc, char **argv)
 			dprintf(out, _("unload expects one argument: unload <ID>\n"));
 			return 64;
 		}
-	        char *endptr;
-	        intmax_t num = strtoimax(argv[1], &endptr, 10);
-	        if(strcmp(endptr, "") || (num == INTMAX_MAX && errno == ERANGE) || num > INT_MAX || num < INT_MIN)
-		{
-			dprintf(out, _("Invalid ID: %s\n"), argv[1]);
-			return 64;
-		}
-		int id = (int)num;
+		char *id = argv[1];
 		dprintf(out, _("Waiting until the processing is done.\n"));
 		int r = 0;
 		exclusive_section_enter();
@@ -228,7 +215,7 @@ static int main_handle_cmd(const int out, int argc, char **argv)
 		if(plug == NULL)
 		{
 			r = 1;
-			dprintf(out, _("Cannot find plugin ID: %d\n"), id);
+			dprintf(out, _("Cannot find plugin ID: %s\n"), id);
 		}
 		else
 		{
@@ -657,7 +644,7 @@ cleanup:
 	if(autoload_setup) {} // Plugins are always unloaded.
 	DEBUG("main.c#main_daemon: Unloading plugins...\n");
 	const int size = plugin_size();
-	int *plugins = calloc(size, sizeof(int));
+	const char **plugins = calloc(size, sizeof(char*));
 	for(int i = 0; i < size; i ++)
 		plugins[i] = plugin_get_by_index(i)->id;
 	for(int i = 0; i < size; i ++)

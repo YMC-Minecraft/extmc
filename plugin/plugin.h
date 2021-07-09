@@ -17,10 +17,13 @@ extern const uint32_t epg_version;
 /* Plugin display name. */
 extern const char *epg_name;
 
+/* NULL terminated unique ID */
+extern const char *epg_id;
+
 /* Current session handle. */
 struct epg_handle {
 	/* Unique ID. */
-	int id;
+	const char *id;
 	/* Send rcon command. */
 	int (*rcon_send)(int, char *);
 	int (*rcon_recv)(int *, char *);

@@ -13,7 +13,7 @@ struct plugin_call_job_args {
 };
 
 struct plugin {
-	int id;
+	const char *id;
 	const char *path;
 	void *handle;
 	char *name;
@@ -32,7 +32,9 @@ struct plugin {
 	int (*fc_server_started)(struct epg_handle *, char *);
 };
 
-int plugin_load(int stderr_fd, const char *path, const int id, struct plugin *out);
-int plugin_unload(int stderr_fd, struct plugin *plugin);
+int plugin_load_meta(int stderr_fd, const char *path, struct plugin *out);
+int plugin_load(int stderr_fd, const struct plugin *plugin);
+int plugin_unload_meta(int stderr_fd, struct plugin *plugin);
+int plugin_unload(int stderr_fd, const struct plugin *plugin);
 
 #endif // _PLUGINS_H

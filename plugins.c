@@ -26,7 +26,17 @@ static const void *plugin_dlsym(int stderr_fd, void *handle, const bool mandator
 	return sym;
 }
 
-int plugin_unload(int stderr_fd, struct plugin *plugin)
+int plugin_unload_meta(int stderr_fd, struct plugin *plugin)
+{
+	if(plugin->handle != NULL)
+	{
+		dlclose(plugin->handle);
+		plugin->handle = NULL;
+	}
+	return 0;
+}
+
+int plugin_unload(int stderr_fd, const struct plugin *plugin)
 {
 	if(plugin->fc_unload != NULL)
 	{
@@ -39,11 +49,6 @@ int plugin_unload(int stderr_fd, struct plugin *plugin)
 			return unload_r;
 		}
 	}
-	if(plugin->handle != NULL)
-	{
-		dlclose(plugin->handle);
-		plugin->handle = NULL;
-	}
 	return 0;
 }
 
@@ -51,6 +56,13 @@ static int plugin_load_v1(int stderr_fd, struct plugin *out)
 {
 	int r = 0;
 	const void *sym;
+	sym = plugin_dlsym(stderr_fd, out->handle, true, "epg_id");
+	if(sym == NULL)
+	{
+		r = 64;
+		goto cleanup;
+	}
+	out->id = *(char**)sym;
 	sym = plugin_dlsym(stderr_fd, out->handle, true, "epg_name");
 	if(sym == NULL)
 	{
@@ -75,10 +87,9 @@ cleanup:
 	return r;
 }
 
-int plugin_load(int stderr_fd, const char *path, const int id, struct plugin *out)
+int plugin_load_meta(int stderr_fd, const char *path, struct plugin *out)
 {
 	int r = 0;
-	out->id = id;
 	out->path = path;
 	out->handle = NULL;
 	out->name = NULL;
@@ -121,16 +132,24 @@ int plugin_load(int stderr_fd, const char *path, const int id, struct plugin *ou
 			dprintf(stderr_fd, _("Unsupported plugin %s: Incompatible with version %u.\n"), path, out->version);
 			break;
 	}
+	goto cleanup;
+cleanup:
+	if(r) plugin_unload_meta(stderr_fd, out);
+	return r;
+}
+
+int plugin_load(int stderr_fd, const struct plugin *plugin)
+{
+	int r = 0;
 	struct epg_handle hdl;
-	plugcall_setup_handle(out, &hdl);
-	r = out->fc_load(&hdl);
+	plugcall_setup_handle(plugin, &hdl);
+	r = plugin->fc_load(&hdl);
 	if(r)
 	{
 		dprintf(stderr_fd, _("Cannot load plugin: it returned an error: %d.\n"), r);
 		goto cleanup;
 	}
-	goto cleanup;
 cleanup:
-	if(r) plugin_unload(stderr_fd, out);
+	if(r) plugin_unload(stderr_fd, plugin);
 	return r;
 }
